@@ -69,7 +69,7 @@ const urlExample = "/api/pin?username=USERNAME&amp;repo=REPO_NAME";
  * @param {string} reponame GitHub repository name.
  * @returns {Promise<RepositoryData>} Repository data.
  */
-const fetchRepo = async (username, reponame) => {
+const fetchRepo = async (username, reponame, token = process.env.PAT_1) => {
   if (!username && !reponame) {
     throw new MissingParamError(["username", "repo"], urlExample);
   }
@@ -80,13 +80,16 @@ const fetchRepo = async (username, reponame) => {
     throw new MissingParamError(["repo"], urlExample);
   }
 
-  let res = await retryer(fetcher, { login: username, repo: reponame });
+  if (!token) {
+    throw new Error("❌ GitHub token (PAT_1) is missing. Please check your Vercel environment variables.");
+  }
+
+  let res = await retryer((vars) => fetcher(vars, token), {
+    login: username,
+    repo: reponame,
+  });
 
   const data = res.data.data;
-
-  if (!data.user && !data.organization) {
-    throw new Error("Not found");
-  }
 
   const isUser = data.organization === null && data.user;
   const isOrg = data.user === null && data.organization;
@@ -102,10 +105,7 @@ const fetchRepo = async (username, reponame) => {
   }
 
   if (isOrg) {
-    if (
-      !data.organization.repository ||
-      data.organization.repository.isPrivate
-    ) {
+    if (!data.organization.repository || data.organization.repository.isPrivate) {
       throw new Error("Organization Repository Not found");
     }
     return {
@@ -116,6 +116,7 @@ const fetchRepo = async (username, reponame) => {
 
   throw new Error("Unexpected behavior");
 };
+
 
 export { fetchRepo };
 export default fetchRepo;
